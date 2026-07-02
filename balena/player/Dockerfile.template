@@ -1,0 +1,51 @@
+# =============================================================================
+#  Образ плеера: собирает Arexibo (Rust) и запускает его под X на Raspberry Pi
+# =============================================================================
+#  %%BALENA_MACHINE_NAME%% автоматически подставляется balena под ваш тип
+#  устройства (raspberrypi4-64, raspberrypi5 и т.д.) при сборке.
+#
+#  ⚠️ ЧЕРНОВИК. Основные места, которые НАДО проверить на реальном железе,
+#     помечены "TODO(verify)". См. balena/README.md, раздел «Что проверить».
+# =============================================================================
+
+FROM balenalib/%%BALENA_MACHINE_NAME%%-debian:bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# --- Зависимости Arexibo (по официальному README проекта) + X-сервер ---
+# Требуется: Rust >=1.75, cmake, C++ компилятор, Qt6 + QtWebEngine (+dev),
+# dev-заголовки dbus (>=1.6) и zeromq (>=4.1), pkg-config.
+# install_packages — обёртка над apt из образов balenalib.
+RUN install_packages \
+      ca-certificates curl git \
+      build-essential cmake pkg-config \
+      libdbus-1-dev libzmq3-dev \
+      qt6-base-dev qt6-webengine-dev qt6-webengine-dev-tools \
+      xserver-xorg xinit x11-xserver-utils \
+      libgl1-mesa-dri \
+      fonts-dejavu
+# TODO(verify): точные имена Qt6-пакетов в Debian bookworm под ARM. Если сборка
+# не находит QtWebEngine — проверьте пакеты qml6-module-*, libqt6webenginecore6.
+
+# --- Rust через rustup (стабильная >= 1.75) ---
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.79.0
+
+# --- Сборка Arexibo из исходников ---
+# Репозиторий: https://github.com/birkenfeld/arexibo
+RUN git clone --depth 1 https://github.com/birkenfeld/arexibo /tmp/arexibo \
+ && cd /tmp/arexibo \
+ && cargo build --release \
+ && install -m 0755 target/release/arexibo /usr/bin/arexibo \
+ && rm -rf /tmp/arexibo /usr/local/cargo/registry
+# TODO(verify): сборка QtWebEngine-приложения под ARM может быть долгой и
+# требовательной к памяти. При нехватке RAM добавьте swap на устройстве или
+# соберите на более мощной машине/эмуляции.
+
+WORKDIR /usr/src/app
+COPY start.sh /usr/src/app/start.sh
+RUN chmod +x /usr/src/app/start.sh
+
+CMD ["/usr/src/app/start.sh"]

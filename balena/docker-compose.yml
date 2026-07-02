@@ -1,0 +1,44 @@
+# =============================================================================
+#  balena fleet: плеер Xibo (Arexibo) на Raspberry Pi
+# =============================================================================
+#  Это описание флота для balenaCloud / openBalena. Один сервис — player —
+#  собирает и запускает сообществный плеер Arexibo, подключённый к вашему Xibo CMS.
+#
+#  ⚠️ ЧЕРНОВИК. Не тестировался на реальном железе. Перед раскаткой на сеть
+#     обкатайте на 1–2 устройствах. Подробности и список проверок — balena/README.md
+#
+#  Деплой:
+#     balena login
+#     cd balena
+#     balena push ИМЯ_ВАШЕГО_ФЛОТА
+#
+#  Переменные CMS_HOST и CMS_KEY задавайте в панели balenaCloud
+#  (Fleet/Device → Variables), а НЕ в этом файле — чтобы не коммитить секреты.
+# =============================================================================
+
+version: "2.1"
+
+volumes:
+  # Здесь Arexibo хранит свою конфигурацию и кэш скачанных медиа.
+  # Том переживает перезапуски и обновления — повторная авторизация не нужна.
+  arexibo-data:
+
+services:
+  player:
+    build: ./player
+    restart: always
+    # Привилегии нужны для доступа к GPU/framebuffer и запуска X-сервера.
+    privileged: true
+    volumes:
+      - arexibo-data:/data
+    labels:
+      io.balena.features.dbus: "1"
+      io.balena.features.kernel-modules: "1"
+    environment:
+      # --- ЗАПОЛНЯЕТСЯ В ПАНЕЛИ balenaCloud, здесь только заглушки ---
+      # Адрес вашего Xibo CMS, обязательно со слэшем в конце:
+      CMS_HOST: ""            # напр. https://cms.вашдомен.ru/
+      # CMS Secret Key из Administration → Settings → Displays:
+      CMS_KEY: ""
+      # (необязательно) фиксированный ID экрана; по умолчанию Arexibo генерит сам:
+      # DISPLAY_ID: ""
