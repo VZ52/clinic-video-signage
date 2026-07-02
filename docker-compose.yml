@@ -1,0 +1,71 @@
+# =============================================================================
+#  Xibo CMS — центральный сервер системы показа видео на телевизорах в клиниках
+# =============================================================================
+#  Это ОФИЦИАЛЬНЫЙ docker-compose Xibo (версия CMS 4.4.4).
+#  Первоисточник: https://github.com/xibosignage/xibo-docker
+#
+#  Перед первым запуском:
+#    1. Скопируйте config.env.template -> config.env
+#    2. Впишите в config.env свой MYSQL_PASSWORD (16 символов, только буквы+цифры)
+#    3. Запустите:  docker compose up -d
+#
+#  Подробная пошаговая инструкция: docs/03-server-install.md
+# =============================================================================
+
+version: "2.1"
+
+services:
+    # --- База данных (хранит настройки, экраны, расписания) ---
+    cms-db:
+        image: mysql:8.4
+        volumes:
+            - "./shared/db:/var/lib/mysql:Z"
+        environment:
+            - MYSQL_DATABASE=cms
+            - MYSQL_USER=cms
+            - MYSQL_RANDOM_ROOT_PASSWORD=yes
+        mem_limit: 1g
+        env_file: config.env
+        restart: always
+
+    # --- XMR: мгновенные команды плеерам (например "обнови сейчас") ---
+    cms-xmr:
+        image: ghcr.io/xibosignage/xibo-xmr:1.3
+        ports:
+            - "9505:9505"
+        restart: always
+        mem_limit: 256m
+        env_file: config.env
+
+    # --- Веб-панель CMS (то, что вы открываете в браузере) ---
+    cms-web:
+        image: ghcr.io/xibosignage/xibo-cms:release-4.4.4
+        volumes:
+            - "./shared/cms/custom:/var/www/cms/custom:Z"
+            - "./shared/backup:/var/www/backup:Z"
+            - "./shared/cms/web/theme/custom:/var/www/cms/web/theme/custom:Z"
+            - "./shared/cms/library:/var/www/cms/library:Z"          # ← сюда сохраняются загруженные видео
+            - "./shared/cms/web/userscripts:/var/www/cms/web/userscripts:Z"
+            - "./shared/cms/ca-certs:/var/www/cms/ca-certs:Z"
+        restart: always
+        environment:
+            - MYSQL_HOST=cms-db
+            - XMR_HOST=cms-xmr
+            - CMS_USE_MEMCACHED=true
+            - MEMCACHED_HOST=cms-memcached
+        env_file: config.env
+        ports:
+            - "80:80"
+        mem_limit: 1g
+
+    # --- Кэш (ускоряет работу панели) ---
+    cms-memcached:
+        image: memcached:alpine
+        command: memcached -m 15
+        restart: always
+        mem_limit: 100M
+
+    # --- Сервис для построения графиков в отчётах ---
+    cms-quickchart:
+      image: ianw/quickchart
+      restart: always

@@ -1,0 +1,17 @@
+# --- Секреты: НИКОГДА не коммитим ---
+config.env
+
+# --- Данные Xibo (создаются при запуске docker compose) ---
+shared/
+CMS-DATABASE-BACKUP.tar.gz
+
+# --- Бэкапы ---
+backups/
+*.sql
+*.sql.gz
+*.tar.gz
+
+# --- Системный мусор ---
+.DS_Store
+Thumbs.db
+*.log
